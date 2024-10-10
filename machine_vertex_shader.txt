@@ -1,0 +1,70 @@
+#version 150 compatibility
+
+in vec3 position;
+in vec3 normal;
+in vec4 bone1;
+in vec4 bone2;
+in vec4 bone3;
+
+uniform samplerBuffer xform_data;
+uniform int buffer_start;
+uniform vec3 camera_pos;
+
+//uniform vec4 bone_value;
+//uniform vec4 transform;
+
+const vec4 rotate[4] = vec4[4]( vec4(1,0,0,1), vec4(0,-1,1,0), vec4(-1,0,0,-1), vec4(0,1,-1,0) );
+out  vec3  vnormal;
+out  vec3  rpos;
+
+void main()
+{
+   vec3 pos = position;
+   vec3 tpos;
+   uint rot;
+
+   vec4 transform   = texelFetch(xform_data, buffer_start + gl_InstanceID*3+0);
+   vec4 bone_value1 = texelFetch(xform_data, buffer_start + gl_InstanceID*3+1);
+   vec4 bone_value2 = texelFetch(xform_data, buffer_start + gl_InstanceID*3+2);
+
+   float sn = sin(bone2.w * abs(bone_value2.y));
+   float cs = cos(bone2.w * abs(bone_value2.y));
+
+   pos.xyz += bone3.xyz * bone_value2.z;
+   pos.z   += bone3.w   * bone_value2.w;
+
+   vec3 norm = normal;
+
+   if (bone1.w == 0.) {
+      float val = pos.x;
+      pos.x     =  val * cs - pos.y  * sn;
+      pos.y     =  val * sn + pos.y  * cs;
+      val = norm.x;
+      norm.x    =  val * cs - norm.y * sn;
+      norm.y    =  val * sn + norm.y * cs;
+   } else {
+      float val = pos.z;
+      pos.z     = val * cs - pos.y  * sn;
+      pos.y     = val * sn + pos.y  * cs;
+      val = norm.z;
+      norm.z    = val * cs - norm.y * sn;
+      norm.y    = val * sn + norm.y * cs;
+   }
+
+   pos.xyz += bone2.xyz * bone_value2.x;
+   pos.xyz += bone1.xyz * bone_value2.z;
+
+   rot = uint(transform.w);
+   tpos.x = dot(rotate[rot].xy, pos.xy);
+   tpos.y = dot(rotate[rot].zw, pos.xy);
+   tpos.z = pos.z;
+
+   vnormal.x = dot(rotate[rot].xy, norm.xy);
+   vnormal.y = dot(rotate[rot].zw, norm.xy);
+   vnormal.z = norm.z;
+
+   tpos += transform.xyz;
+   rpos = tpos - camera_pos;
+
+   gl_Position = gl_ModelViewProjectionMatrix * vec4(tpos,1.0);
+}
